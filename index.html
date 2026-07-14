@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1c146f" />
+    <title>UniMove — iPhone 17 UI Prototype</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="prototype-shell">
+      <section class="prototype-intro" aria-labelledby="prototype-title">
+        <span class="eyebrow">BIS2102 · GROUP 5</span>
+        <h1 id="prototype-title">UniMove</h1>
+        <p>Interactive iPhone 17 UI prototype for each UniMove system role.</p>
+
+        <div class="role-picker" aria-label="Choose a role preview">
+          <button class="role-choice is-active" data-role="commuter">
+            <span><strong>Commuter</strong><small>Journey, wallet & rewards</small></span>
+          </button>
+          <button class="role-choice" data-role="admin">
+            <span><strong>Administrator</strong><small>Platform management</small></span>
+          </button>
+          <button class="role-choice" data-role="operator">
+            <span><strong>Transport operator</strong><small>Live transport feed</small></span>
+          </button>
+        </div>
+
+        <div class="prototype-note">
+          <span>Prototype behaviour</span>
+          <p>Buttons navigate or show local feedback. Inputs accept text, but no real data is stored or sent.</p>
+        </div>
+      </section>
+
+      <section class="device-stage" aria-label="iPhone 17 app preview">
+        <div class="iphone-frame">
+          <div class="iphone-screen" id="app" aria-live="polite"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
