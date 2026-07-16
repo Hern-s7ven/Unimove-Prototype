@@ -4,11 +4,18 @@ const state = {
   role: 'commuter',
   screen: 'commuter-auth',
   toast: '',
+  history: [],
   savedRoute: false,
   selectedRoute: 'mrt-lrt',
   favourites: ['mrt-lrt'],
   activeFilter: 'Best match',
-  selectedAmount: 'RM20',
+  selectedAmount: '',
+  topupManualAmount: '',
+  resetModalOpen: false,
+  selectedStation: 'Pasar Seni station',
+  selectedVehicle: 'KJ5 · Kelana Jaya Line',
+  rewardFilter: 'All rewards',
+  transactionFilter: 'All',
   toggles: { transfers: true, accessible: false, alerts: true },
   homePreferences: new Set(['Avoid crowded services', 'Lowest fare']),
 };
@@ -56,10 +63,17 @@ function statusbar() {
 
 function header(title, backTo, right = '') {
   return `<header class="app-header">
-    ${backTo ? `<button class="back-button" data-go="${backTo}" aria-label="Go back">${i('arrowLeft')}</button>` : '<span class="header-spacer"></span>'}
+    ${backTo ? `<button class="back-button" data-back="${backTo}" aria-label="Go back">${i('arrowLeft')}</button>` : '<span class="header-spacer"></span>'}
     <h1 class="app-title">${title}</h1>
     ${right || '<span class="header-spacer"></span>'}
   </header>`;
+}
+
+function navigateTo(screen, options = {}) {
+  const { replace = false, clearHistory = false } = options;
+  if (clearHistory) state.history = [];
+  else if (!replace && screen !== state.screen) state.history.push(state.screen);
+  state.screen = screen;
 }
 
 function bottomNav(active) {
@@ -87,14 +101,19 @@ function field(label, type = 'text', placeholder = '', value = '', icon = '', op
   const name = options.name || id;
   const minLength = options.minLength || (type === 'password' ? 8 : '');
   const match = options.match ? ` data-match="${options.match}"` : '';
+  const notMatch = options.notMatch ? ` data-not-match="${options.notMatch}" data-not-match-message="${options.notMatchMessage || 'This value must be different.'}"` : '';
+  const required = options.required === false ? '' : 'data-validate required';
+  const extraData = options.extraData || '';
   const toggle = options.toggle ? `<button class="password-toggle" type="button" data-toggle-password="${id}">Show</button>` : '';
   const controlClass = `${icon ? 'field-with-icon ' : ''}${options.toggle ? 'password-control' : ''}`.trim();
-  return `<label class="form-field"><span class="field-label">${label}</span><span class="${controlClass}">${icon ? i(icon) : ''}<input id="${id}" name="${name}" class="text-input" type="${type}" placeholder="${placeholder}" value="${value}" data-label="${label}" data-validate required ${minLength ? `minlength="${minLength}"` : ''}${match} />${toggle}</span><span class="field-error"></span></label>`;
+  return `<label class="form-field"><span class="field-label">${label}</span><span class="${controlClass}">${icon ? i(icon) : ''}<input id="${id}" name="${name}" class="text-input" type="${type}" placeholder="${placeholder}" value="${value}" data-label="${label}" ${required} ${minLength ? `minlength="${minLength}"` : ''}${match}${notMatch}${extraData} />${toggle}</span><span class="field-error"></span></label>`;
 }
 
 function selectField(label, options, config = {}) {
   const id = config.id || slug(label);
-  return `<label class="form-field"><span class="field-label">${label}</span><span class="select-control"><select id="${id}" name="${config.name || id}" class="select-input" data-label="${label}" data-validate required>${options.map((option, index) => `<option value="${option}" ${index === 0 ? 'selected' : ''}>${option}</option>`).join('')}</select>${i('chevronDown')}</span><span class="field-error"></span></label>`;
+  const selected = config.value || options[0];
+  const stateKey = config.stateKey ? ` data-state-key="${config.stateKey}"` : '';
+  return `<label class="form-field"><span class="field-label">${label}</span><span class="select-control"><select id="${id}" name="${config.name || id}" class="select-input" data-label="${label}" data-validate required${stateKey}>${options.map(option => `<option value="${option}" ${option === selected ? 'selected' : ''}>${option}</option>`).join('')}</select>${i('chevronDown')}</span><span class="field-error"></span></label>`;
 }
 
 function textareaField(label, placeholder, options = {}) {
@@ -115,13 +134,40 @@ function actionRow(icon, title, detail, target, tone = '') {
 }
 
 const routeOptions = {
-  'mrt-lrt': { id: 'mrt-lrt', name: 'MRT + LRT', detail: 'MRT Kajang Line → Kelana Jaya Line', duration: '11:24 AM', fare: 'RM 4.80', transfers: '1', tag: 'Recommended', recommended: true, progress: 61, next: 'Pasar Seni', status: 'Minor delay near Pasar Seni', disruption: 'minor' },
-  'brt-lrt': { id: 'brt-lrt', name: 'BRT + LRT', detail: 'BRT Sunway Line → Kelana Jaya Line', duration: '11:38 AM', fare: 'RM 3.60', transfers: '2', tag: 'Lowest fare', progress: 34, next: 'USJ 7', status: 'No disruption reported', disruption: 'none' },
-  'bus-mrt': { id: 'bus-mrt', name: 'Bus + MRT', detail: 'Rapid KL Bus → MRT Kajang Line', duration: '11:31 AM', fare: 'RM 4.10', transfers: '1', tag: 'Less walking', progress: 78, next: 'Bukit Bintang', status: 'Crowded near Bukit Bintang', disruption: 'crowd' },
+  'mrt-lrt': { id: 'mrt-lrt', name: 'MRT + LRT', detail: 'MRT Kajang Line → Kelana Jaya Line', duration: '10:24 AM', fare: 'RM 4.80', transfers: '1', tag: 'Recommended', recommended: true, progress: 61, next: 'Pasar Seni', countdown: '02:18', liveService: 'KJ5 · Kelana Jaya Line', liveDetail: '2 min away · moving toward KL Sentral', status: 'Minor delay near Pasar Seni', disruption: 'minor' },
+  'brt-lrt': { id: 'brt-lrt', name: 'BRT + LRT', detail: 'BRT Sunway Line → Kelana Jaya Line', duration: '10:38 AM', fare: 'RM 3.60', transfers: '2', tag: 'Lowest fare', progress: 34, next: 'USJ 7', countdown: '05:42', liveService: 'BRT 04 · Sunway Line', liveDetail: '6 min away · toward USJ 7', status: 'No disruption reported', disruption: 'none' },
+  'bus-mrt': { id: 'bus-mrt', name: 'Bus + MRT', detail: 'Rapid KL Bus → MRT Kajang Line', duration: '10:31 AM', fare: 'RM 4.10', transfers: '1', tag: 'Less walking', progress: 78, next: 'Bukit Bintang', countdown: '01:26', liveService: 'MRT 15 · Kajang Line', liveDetail: '1 min away · moving toward Bukit Bintang', status: 'Crowded near Bukit Bintang', disruption: 'crowd' },
+};
+
+const stationLiveData = {
+  'Pasar Seni station': { line: 'KELANA JAYA LINE · PLATFORM 2', countdown: '02:18', arrival: 'Next service toward Gombak', following: 'KJ4 · 8 minutes away', time: '08:41 AM', crowd: 63, crowdLabel: 'Moderately busy', crowdColor: 'var(--amber)' },
+  'KL Sentral station': { line: 'MRT KAJANG LINE · PLATFORM 1', countdown: '04:05', arrival: 'Next service toward Kajang', following: 'MRT 16 · 11 minutes away', time: '08:44 AM', crowd: 42, crowdLabel: 'Comfortable to travel', crowdColor: 'var(--teal)' },
+  'USJ 7 station': { line: 'BRT SUNWAY LINE · PLATFORM 3', countdown: '06:32', arrival: 'Next service toward Sunway Setia Jaya', following: 'BRT 05 · 13 minutes away', time: '08:47 AM', crowd: 78, crowdLabel: 'Busy — allow extra time', crowdColor: 'var(--red)' },
+};
+
+const vehicleLiveData = {
+  'KJ5 · Kelana Jaya Line': { title: 'KJ5 · Car 3', occupancy: 47, label: 'Seats likely available', color: 'var(--teal)' },
+  'MRT 15 · Kajang Line': { title: 'MRT 15 · Car 2', occupancy: 74, label: 'Moderately crowded', color: 'var(--amber)' },
+  'BRT 04 · Sunway Line': { title: 'BRT 04', occupancy: 28, label: 'Plenty of space available', color: 'var(--teal)' },
 };
 
 function selectedRoute() {
   return routeOptions[state.selectedRoute] || routeOptions['mrt-lrt'];
+}
+
+function routesForActiveFilter() {
+  const routes = Object.values(routeOptions);
+  if (state.activeFilter === 'Lowest fare') return [...routes].sort((a, b) => Number(a.fare.replace(/[^0-9.]/g, '')) - Number(b.fare.replace(/[^0-9.]/g, '')));
+  if (state.activeFilter === 'Fastest') return [...routes].sort((a, b) => a.duration.localeCompare(b.duration));
+  return routes;
+}
+
+function favouriteRouteRow(route) {
+  return `<button class="favourite-row row-button" type="button" data-route="${route.id}" data-go="commuter-journey"><span class="row-icon">${i('route')}</span><span class="row-copy"><h3>Sunway University → KL Sentral</h3><p>${route.name} · ${route.fare}</p></span><span class="row-value">${route.duration}</span>${i('chevron')}</button>`;
+}
+
+function resetEmailModal() {
+  return `<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reset-email-title"><section class="modal-card"><button class="modal-close" type="button" data-action="close-reset-modal" aria-label="Close">${i('close')}</button><h2 id="reset-email-title">Verify your email</h2><p>Enter the email address linked to your UniMove account.</p><form class="form-stack" data-form="commuter-reset-verify" novalidate>${formError()}${field('Email address', 'email', 'you@example.com', '', 'mail', { id: 'reset-verify-email' })}<button class="primary-button full-width" type="submit">Verify email</button></form></section></div>`;
 }
 
 function routeCard(route) {
@@ -136,17 +182,17 @@ function routeCard(route) {
 function commuterAuth() {
   return `<div class="auth-layout">
     <div class="brand-lockup">${logo()}<h1>UniMove</h1><p>One app for every journey.</p></div>
-    <form class="form-stack" data-form="commuter-login" novalidate>${formError()}${field('Email address', 'email', 'you@example.com', '', 'mail')}${field('Password', 'password', 'At least 8 characters', '', 'lock', { id: 'commuter-login-password', toggle: true })}<button class="link-button" type="button" data-go="commuter-reset">Forgot password?</button><button class="primary-button full-width" type="submit">Log in</button></form>
+    <form class="form-stack" data-form="commuter-login" novalidate>${formError()}${field('Email address', 'email', 'you@example.com', '', 'mail')}${field('Password', 'password', 'At least 8 characters', '', 'lock', { id: 'commuter-login-password', toggle: true })}<button class="link-button" type="button" data-action="open-reset-modal">Forgot password?</button><button class="primary-button full-width" type="submit">Log in</button></form>
     <div class="auth-footer">New to UniMove? <button data-go="commuter-register">Create an account</button></div>
-  </div>`;
+  </div>${state.resetModalOpen ? resetEmailModal() : ''}`;
 }
 
 function commuterRegister() {
   return `${header('Create account', 'commuter-auth')}<form class="form-stack" data-form="commuter-register" novalidate>${formError()}${field('Full name', 'text', 'Your name', '', 'user')}${field('Email address', 'email', 'you@example.com', '', 'mail')}${field('Phone number', 'tel', '+60 12 345 6789')}${field('Password', 'password', 'At least 8 characters', '', 'lock', { id: 'create-password', toggle: true })}${field('Confirm password', 'password', 'Re-enter your password', '', 'lock', { id: 'create-confirm-password', match: 'create-password', toggle: true })}<button class="primary-button full-width" type="submit">Create account</button></form>`;
 }
 
-function commuterReset() {
-  return `${header('Reset password', 'commuter-auth')}<div class="route-hero"><h2>We’ll help you back in.</h2><p>Enter your email and choose a new password to update your UniMove account.</p></div><form class="form-stack" data-form="commuter-reset" novalidate>${formError()}${field('Email address', 'email', 'you@example.com', '', 'mail')}${field('New password', 'password', 'At least 8 characters', '', 'lock', { id: 'reset-password', toggle: true })}${field('Confirm new password', 'password', 'Re-enter new password', '', 'lock', { id: 'reset-confirm-password', match: 'reset-password', toggle: true })}<button class="primary-button full-width" type="submit">Update password</button></form>`;
+function commuterResetPassword() {
+  return `${header('Create new password', 'commuter-auth')}<div class="route-hero"><h2>Choose a new password</h2><p>Your email has been verified. Create a new password to continue.</p></div><form class="form-stack" data-form="commuter-reset-password" novalidate>${formError()}${field('New password', 'password', 'At least 8 characters', '', 'lock', { id: 'reset-password', toggle: true })}${field('Confirm new password', 'password', 'Re-enter new password', '', 'lock', { id: 'reset-confirm-password', match: 'reset-password', toggle: true })}<button class="primary-button full-width" type="submit">Update password</button></form>`;
 }
 
 function commuterHome() {
@@ -161,15 +207,15 @@ function commuterHome() {
 }
 
 function commuterRoutePlan() {
-  return `${header('Plan route', 'commuter-home', `<button class="icon-button" data-go="commuter-favourites" aria-label="Favourites">${i('star')}</button>`)}
+  return `${header('Plan route', 'commuter-home')}
   <section class="route-hero"><h2>Where are you going?</h2><p>Find the best route across Malaysia’s public transport network.</p></section>
   <form class="form-stack" data-form="route-plan" novalidate>${formError()}<div class="route-input-group">${field('Origin', 'text', 'Enter origin', 'Sunway University', '', { id: 'route-origin' })}${field('Destination', 'text', 'Enter destination', 'KL Sentral', '', { id: 'route-destination' })}</div><h2 class="section-label">Journey preferences</h2><div class="filter-row"><button class="filter-chip is-active" type="button" data-action="filter">Best route</button><button class="filter-chip" type="button" data-action="filter">Avoid transfers</button><button class="filter-chip" type="button" data-action="filter">Accessible</button></div><button class="primary-button full-width" style="margin-top:20px" type="submit">Find routes</button></form>`;
 }
 
 function commuterRouteResults() {
   const filters = ['Best match','Lowest fare','Fastest'];
-  return `${header('Route options', 'commuter-route-plan')}<div class="filter-row">${filters.map(f => `<button class="filter-chip ${state.activeFilter === f ? 'is-active' : ''}" data-filter="${f}">${f}</button>`).join('')}</div>
-    ${Object.values(routeOptions).map(routeCard).join('')}`;
+  return `${header('Route options', 'commuter-route-plan', `<button class="icon-button" data-go="commuter-favourites" aria-label="Favourites">${i('star')}</button>`)}<div class="filter-row">${filters.map(f => `<button class="filter-chip ${state.activeFilter === f ? 'is-active' : ''}" type="button" data-route-filter="${f}">${f}</button>`).join('')}</div>
+    ${routesForActiveFilter().map(routeCard).join('')}`;
 }
 
 function commuterSaveFavourite() {
@@ -178,32 +224,35 @@ function commuterSaveFavourite() {
 }
 
 function commuterFavourites() {
-  const favouriteRows = state.favourites.map(id => { const route = routeOptions[id]; return listRow('route', `Sunway University → KL Sentral`, `${route.name} · ${route.fare}`, route.duration.replace(' AM', '')); }).join('');
-  return `${header('Favourite routes', 'commuter-home')}<div class="list-card">${favouriteRows || '<div class="empty-state"><h2>No favourite routes yet</h2><p>Save a route from Route options to see it here.</p></div>'}</div><button class="primary-button full-width" style="margin-top:15px" data-go="commuter-route-plan">Plan a route</button>`;
+  const favouriteRows = state.favourites.map(id => favouriteRouteRow(routeOptions[id])).join('');
+  return `${header('Favourite routes', 'commuter-route-results')}<div class="list-card">${favouriteRows || '<div class="empty-state"><h2>No favourite routes yet</h2><p>Save a route from Route options to see it here.</p></div>'}</div><button class="primary-button full-width" style="margin-top:15px" data-go="commuter-route-plan">Plan a route</button>`;
 }
 
 function commuterLiveMap() {
-  return `${header('Live tracking', 'commuter-home', `<button class="icon-button" data-go="commuter-countdown" aria-label="Arrival countdown">${i('clock')}</button>`)}
-  <section class="map-panel"><div class="map-river"></div><div class="map-route"></div><span class="map-pin start"></span><span class="map-pin bus"></span><span class="map-pin end"></span><div class="map-float"><span class="row-icon">${i('bus')}</span><div><strong>KJ5 · Kelana Jaya Line</strong><span>1 min away · moving toward KL Sentral</span></div></div></section>
+  const route = selectedRoute();
+  return `${header('Live tracking', 'commuter-home')}
+  <section class="map-panel"><div class="map-river"></div><svg class="map-route-svg" viewBox="0 0 320 278" aria-hidden="true"><path class="map-road" d="M46 58 C86 73 112 107 156 124 S227 162 273 212"/><path class="map-route-path" d="M46 58 C86 73 112 107 156 124 S227 162 273 212"/></svg><span class="map-pin start"></span><span class="map-pin bus"></span><span class="map-pin end"></span><div class="map-float"><span class="row-icon">${i('bus')}</span><div><strong>${route.liveService}</strong><span>${route.liveDetail}</span></div></div></section>
   <h2 class="section-label">Journey details</h2><div class="button-row"><button class="soft-button" data-go="commuter-journey">Journey progress</button><button class="soft-button" data-go="commuter-countdown">Arrival countdown</button></div><div class="button-row" style="margin-top:9px"><button class="soft-button" data-go="commuter-crowd">Station crowd</button><button class="soft-button" data-go="commuter-occupancy">Vehicle occupancy</button></div>`;
 }
 
 function commuterJourney() {
   const route = selectedRoute();
-  const countdown = route.id === 'brt-lrt' ? '05:42' : route.id === 'bus-mrt' ? '01:26' : '02:18';
-  return `${header('Journey progress', 'commuter-live-map')}<section class="progress-card"><h2>Sunway University → KL Sentral</h2><p>${route.detail} · ${route.transfers} transfer${route.transfers === '1' ? '' : 's'}</p><div class="progress-track" style="--progress:${route.progress}%"><i class="progress-dot"></i></div><div class="progress-stations"><span><strong>Sunway</strong>Departed</span><span style="text-align:center"><strong>${route.next}</strong>Next stop</span><span style="text-align:right"><strong>KL Sentral</strong>Destination</span></div></section><section class="countdown-card" style="margin-top:14px"><div class="small">NEXT ARRIVAL</div><div class="countdown">${countdown}</div><div class="arrival">${route.next} station · Platform 2</div></section><div class="button-row" style="margin-top:14px"><button class="secondary-button" data-go="commuter-disruption">Service status</button><button class="soft-button" data-go="commuter-notifications">Journey updates</button></div>`;
+  return `${header('Journey progress', 'commuter-route-plan')}<section class="progress-card"><h2>Sunway University → KL Sentral</h2><p>${route.detail} · ${route.transfers} transfer${route.transfers === '1' ? '' : 's'}</p><div class="progress-track" style="--progress:${route.progress}%"><i class="progress-dot"></i></div><div class="progress-stations"><span><strong>Sunway</strong>Departed</span><span style="text-align:center"><strong>${route.next}</strong>Next stop</span><span style="text-align:right"><strong>KL Sentral</strong>Destination</span></div></section><section class="countdown-card" style="margin-top:14px"><div class="small">NEXT ARRIVAL</div><div class="countdown">${route.countdown}</div><div class="arrival">${route.next} station · arriving before ${route.duration}</div></section><div class="button-row" style="margin-top:14px"><button class="secondary-button" data-go="commuter-disruption">Service status</button><button class="secondary-button" data-go="commuter-journey-updates">Journey updates</button></div>`;
 }
 
 function commuterCountdown() {
-  return `${header('Arrival countdown', 'commuter-live-map')}${selectField('Select station', ['Pasar Seni station', 'KL Sentral station', 'USJ 7 station'])}<section class="countdown-card" style="margin-top:15px"><div class="small">KELANA JAYA LINE · PLATFORM 2</div><div class="countdown">02:18</div><div class="arrival">Next service toward Gombak</div></section><div class="list-card" style="margin-top:14px">${listRow('bus','Following service','KJ4 · 8 minutes away','08:41 AM')}</div>`;
+  const station = stationLiveData[state.selectedStation];
+  return `${header('Arrival countdown', 'commuter-live-map')}${selectField('Select station', Object.keys(stationLiveData), { value: state.selectedStation, stateKey: 'selectedStation' })}<section class="countdown-card" style="margin-top:15px"><div class="small">${station.line}</div><div class="countdown">${station.countdown}</div><div class="arrival">${station.arrival}</div></section><div class="list-card" style="margin-top:14px">${listRow('bus','Following service',station.following,station.time)}</div>`;
 }
 
 function commuterCrowd() {
-  return `${header('Station crowd level', 'commuter-live-map')}${selectField('Select station', ['Pasar Seni station', 'KL Sentral station', 'USJ 7 station'])}<section class="crowd-gauge"><h2>Pasar Seni station</h2><div class="gauge-ring"><div><b>63%</b><span>crowd level</span></div></div><p class="gauge-note">Moderately busy</p></section><button class="secondary-button full-width" style="margin-top:14px" data-go="commuter-occupancy">View vehicle occupancy</button>`;
+  const station = stationLiveData[state.selectedStation];
+  return `${header('Station crowd level', 'commuter-live-map')}${selectField('Select station', Object.keys(stationLiveData), { value: state.selectedStation, stateKey: 'selectedStation' })}<section class="crowd-gauge"><h2>${state.selectedStation}</h2><div class="gauge-ring" style="background:conic-gradient(${station.crowdColor} 0 ${station.crowd}%, #ebe8f8 ${station.crowd}% 100%)"><div><b>${station.crowd}%</b><span>crowd level</span></div></div><p class="gauge-note" style="color:${station.crowdColor}">${station.crowdLabel}</p></section><button class="secondary-button full-width" style="margin-top:14px" data-go="commuter-occupancy">View vehicle occupancy</button>`;
 }
 
 function commuterOccupancy() {
-  return `${header('Vehicle occupancy', 'commuter-live-map')}${selectField('Select vehicle', ['KJ5 · Kelana Jaya Line', 'MRT 15 · Kajang Line', 'BRT 04 · Sunway Line'])}<section class="crowd-gauge"><h2>KJ5 · Car 3</h2><div class="gauge-ring" style="background:conic-gradient(var(--teal) 0 47%, #e1eeeb 47% 100%)"><div><b>47%</b><span>occupancy</span></div></div><p class="gauge-note" style="color:var(--teal-dark)">Seats likely available</p></section>`;
+  const vehicle = vehicleLiveData[state.selectedVehicle];
+  return `${header('Vehicle occupancy', 'commuter-live-map')}${selectField('Select vehicle', Object.keys(vehicleLiveData), { value: state.selectedVehicle, stateKey: 'selectedVehicle' })}<section class="crowd-gauge"><h2>${vehicle.title}</h2><div class="gauge-ring" style="background:conic-gradient(${vehicle.color} 0 ${vehicle.occupancy}%, #ebe8f8 ${vehicle.occupancy}% 100%)"><div><b>${vehicle.occupancy}%</b><span>occupancy</span></div></div><p class="gauge-note" style="color:${vehicle.color}">${vehicle.label}</p></section>`;
 }
 
 function commuterWallet() {
@@ -212,19 +261,23 @@ function commuterWallet() {
 
 function commuterTopup() {
   const amounts = ['RM10','RM20','RM50','RM100','RM150','RM200'];
-  return `${header('Top up wallet', 'commuter-wallet')}<form class="form-stack" data-form="topup" novalidate>${formError()}${field('Top-up amount', 'number', '0.00', '')}<div><span class="field-label">Quick select</span><div class="amount-grid">${amounts.map(a => `<button class="amount-button ${state.selectedAmount === a ? 'is-active' : ''}" type="button" data-amount="${a}">${a}</button>`).join('')}</div></div>${selectField('Payment method', ['Online banking', 'Credit / debit card', 'E-wallet'])}<button class="primary-button full-width" type="submit">Confirm top up</button></form>`;
+  return `${header('Top up wallet', 'commuter-wallet')}<form class="form-stack" data-form="topup" novalidate>${formError()}${field('Type an amount', 'number', 'Optional', state.topupManualAmount, '', { id: 'topup-amount', required: false, extraData: 'data-topup-manual' })}<div><span class="field-label">Quick select</span><div class="amount-grid">${amounts.map(a => `<button class="amount-button ${state.selectedAmount === a ? 'is-active' : ''}" type="button" data-amount="${a}">${a}</button>`).join('')}</div><p class="input-hint">Choose one quick amount or type one amount above.</p></div>${selectField('Payment method', ['Online banking', 'Credit / debit card', 'E-wallet'])}<button class="primary-button full-width" type="submit">Confirm top up</button></form>`;
 }
 
 function commuterTransactions() {
-  return `${header('Transaction history', 'commuter-wallet')}<div class="filter-row"><button class="filter-chip is-active">All</button><button class="filter-chip">Top up</button><button class="filter-chip">Payment</button><button class="filter-chip">Refund</button></div><div class="list-card" style="margin-top:12px">${listRow('ticket','Journey fare','14 Jul 2026 · Kelana Jaya Line','- RM 2.70','red')}${listRow('plus','Wallet top up','11 Jul 2026 · Online banking','+ RM 20.00','teal')}${listRow('wallet','Refund processed','09 Jul 2026 · Route cancellation','+ RM 3.60','teal')}${listRow('ticket','Journey fare','08 Jul 2026 · MRT Kajang Line','- RM 4.80','red')}</div>`;
-}
-
-function qrSquares() {
-  return Array.from({ length: 81 }, () => '<i></i>').join('');
+  const transactions = [
+    { type: 'Payment', icon: 'ticket', title: 'Journey fare', detail: '14 Jul 2026 · Kelana Jaya Line', amount: '- RM 2.70', tone: 'red' },
+    { type: 'Top up', icon: 'plus', title: 'Wallet top up', detail: '11 Jul 2026 · Online banking', amount: '+ RM 20.00', tone: 'teal' },
+    { type: 'Refund', icon: 'wallet', title: 'Refund processed', detail: '09 Jul 2026 · Route cancellation', amount: '+ RM 3.60', tone: 'teal' },
+    { type: 'Payment', icon: 'ticket', title: 'Journey fare', detail: '08 Jul 2026 · MRT Kajang Line', amount: '- RM 4.80', tone: 'red' },
+  ];
+  const filters = ['All', 'Top up', 'Payment', 'Refund'];
+  const visibleTransactions = state.transactionFilter === 'All' ? transactions : transactions.filter(transaction => transaction.type === state.transactionFilter);
+  return `${header('Transaction history', 'commuter-wallet')}<div class="filter-row">${filters.map(filter => `<button class="filter-chip ${state.transactionFilter === filter ? 'is-active' : ''}" type="button" data-transaction-filter="${filter}">${filter}</button>`).join('')}</div><div class="list-card" style="margin-top:12px">${visibleTransactions.map(transaction => listRow(transaction.icon, transaction.title, transaction.detail, transaction.amount, transaction.tone)).join('')}</div>`;
 }
 
 function commuterTicket() {
-  return `${header('QR e-ticket', 'commuter-wallet')}<section class="qr-card"><span class="tag teal">ACTIVE TICKET</span><div class="qr-code"><span class="qr-corner c1"></span><span class="qr-corner c2"></span><span class="qr-corner c3"></span>${qrSquares()}</div><h2 style="font-size:16px;margin:8px 0 0">KL Sentral journey</h2><p>Valid until 11:45 AM · Present at the station scanner.</p></section><div class="button-row" style="margin-top:14px"><button class="secondary-button" data-go="commuter-payment">Payment</button><button class="primary-button" data-go="commuter-scan">${i('scan')} Scan to board</button></div>`;
+  return `${header('QR e-ticket', 'commuter-wallet')}<section class="qr-card"><span class="tag teal">ACTIVE TICKET</span><img class="ticket-qr-image" src="assets/unimove-ticket-qr.png" alt="QR code for the active UniMove e-ticket" /><h2 style="font-size:16px;margin:8px 0 0">KL Sentral journey</h2><p>Valid until 11:45 AM · Present at the station scanner.</p></section><div class="button-row" style="margin-top:14px"><button class="secondary-button" data-go="commuter-payment">Payment</button><button class="primary-button" data-go="commuter-scan">${i('scan')} Scan to board</button></div>`;
 }
 
 function commuterScan() {
@@ -232,15 +285,15 @@ function commuterScan() {
 }
 
 function commuterPayment() {
-  return `${header('Make payment', 'commuter-wallet')}<section class="wallet-balance"><p>JOURNEY FARE</p><h2>RM 2.70</h2><span class="last-topup">Kelana Jaya Line · KL Sentral</span></section><div class="form-stack" style="margin-top:15px">${selectField('Payment method', ['UniMove Wallet · RM 18.40', 'Online banking', 'Credit / debit card'])}<button class="primary-button full-width" data-action="payment" data-go="commuter-earned">Confirm payment</button><button class="link-button" data-go="commuter-refund">Request a refund</button></div>`;
+  return `${header('Make payment', 'commuter-wallet')}<section class="wallet-balance"><p>JOURNEY FARE</p><h2>RM 2.70</h2><span class="last-topup">Kelana Jaya Line · KL Sentral</span></section><div class="form-stack" style="margin-top:15px">${selectField('Payment method', ['UniMove Wallet · RM 18.40', 'Online banking', 'Credit / debit card'])}<button class="primary-button full-width" data-action="payment" data-go="commuter-earned">Confirm payment</button></div>`;
 }
 
 function commuterEarned() {
-  return `${header('Points earned', 'commuter-payment')}<section class="points-hero" style="text-align:center"><p>JOURNEY COMPLETE</p><h2>+40</h2><span class="tier">Loyalty points credited for this completed journey.</span></section><section class="list-card" style="margin-top:14px">${listRow('star','New points balance','Gold commuter tier','1,280 pts','purple')}</section><button class="primary-button full-width" style="margin-top:15px" data-go="commuter-loyalty">View loyalty rewards</button>`;
+  return `${header('Points earned', 'commuter-home')}<section class="points-hero" style="text-align:center"><p>JOURNEY COMPLETE</p><h2>+40</h2><span class="tier">Loyalty points credited for this completed journey.</span></section><section class="list-card" style="margin-top:14px">${listRow('star','New points balance','Gold commuter tier','1,280 pts','purple')}</section><button class="primary-button full-width" style="margin-top:15px" data-go="commuter-loyalty">View loyalty rewards</button><button class="link-button full-width" style="margin-top:10px" data-go="commuter-refund">Request payment refund</button>`;
 }
 
 function commuterRefund() {
-  return `${header('Request refund', 'commuter-payment')}<section class="route-hero"><h2>Request a refund</h2><p>Tell us why the payment needs to be reviewed. This is a prototype request only.</p></section><form class="form-stack" data-form="refund" novalidate>${formError()}${field('Refund amount', 'number', '2.70', '2.70')}${selectField('Reason', ['Service disruption', 'Duplicate payment', 'Route cancelled', 'Other'])}${textareaField('Additional details', 'Describe what happened')}<button class="primary-button full-width" type="submit">Send refund request</button></form>`;
+  return `${header('Request refund', 'commuter-earned')}<section class="route-hero"><h2>Request a refund</h2><p>Tell us why the confirmed payment needs to be reviewed. This is a prototype request only.</p></section><form class="form-stack" data-form="refund" novalidate>${formError()}${field('Refund amount', 'number', '2.70', '2.70')}${selectField('Reason', ['Service disruption', 'Duplicate payment', 'Route cancelled', 'Other'])}${textareaField('Additional details', 'Describe what happened')}<button class="primary-button full-width" type="submit">Send refund request</button></form>`;
 }
 
 function commuterLoyalty() {
@@ -248,7 +301,14 @@ function commuterLoyalty() {
 }
 
 function commuterRewards() {
-  return `${header('Rewards catalogue', 'commuter-loyalty')}<div class="filter-row"><button class="filter-chip is-active">All rewards</button><button class="filter-chip">Free rides</button><button class="filter-chip">Vouchers</button></div><section class="reward-card"><div class="reward-art">⌁</div><div><h3>Free LRT ride</h3><p>Credit one free ride to your account.</p></div><div class="reward-side"><b>800 pts</b><button data-action="redeem-ride">Redeem</button></div></section><section class="reward-card"><div class="reward-art">☕</div><div><h3>Bean Brothers RM5 voucher</h3><p>Valid until 31 Aug 2026.</p></div><div class="reward-side"><b>500 pts</b><button data-action="redeem-voucher">Redeem</button></div></section><section class="reward-card"><div class="reward-art">🍔</div><div><h3>Campus meal voucher</h3><p>Valid at selected Sunway outlets.</p></div><div class="reward-side"><b>650 pts</b><button data-action="redeem-voucher">Redeem</button></div></section>`;
+  const rewards = [
+    { type: 'Free rides', art: '⌁', title: 'Free LRT ride', detail: 'Credit one free ride to your account.', points: '800 pts', action: 'redeem-ride' },
+    { type: 'Vouchers', art: '☕', title: 'Bean Brothers RM5 voucher', detail: 'Valid until 31 Aug 2026.', points: '500 pts', action: 'redeem-voucher' },
+    { type: 'Vouchers', art: '🍔', title: 'Campus meal voucher', detail: 'Valid at selected Sunway outlets.', points: '650 pts', action: 'redeem-voucher' },
+  ];
+  const visibleRewards = state.rewardFilter === 'All rewards' ? rewards : rewards.filter(reward => reward.type === state.rewardFilter);
+  const filters = ['All rewards', 'Free rides', 'Vouchers'];
+  return `${header('Rewards catalogue', 'commuter-loyalty')}<div class="filter-row">${filters.map(filter => `<button class="filter-chip ${state.rewardFilter === filter ? 'is-active' : ''}" type="button" data-reward-filter="${filter}">${filter}</button>`).join('')}</div>${visibleRewards.map(reward => `<section class="reward-card"><div class="reward-art">${reward.art}</div><div><h3>${reward.title}</h3><p>${reward.detail}</p></div><div class="reward-side"><b>${reward.points}</b><button data-action="${reward.action}">Redeem</button></div></section>`).join('')}`;
 }
 
 function commuterNotifications() {
@@ -258,10 +318,15 @@ function commuterNotifications() {
 function commuterDisruption() {
   const route = selectedRoute();
   if (route.disruption === 'none') {
-    return `${header('Service disruption', 'commuter-notifications')}<section class="clear-status"><span class="tag teal">ALL CLEAR</span><h2>No service disruption on this route</h2><p>${route.name} is operating normally. You can continue to KL Sentral without a service-alert detour.</p></section><button class="primary-button full-width" style="margin-top:14px" data-go="commuter-journey">Return to journey progress</button>`;
+    return `${header('Service disruption', 'commuter-journey')}<section class="clear-status"><span class="tag teal">ALL CLEAR</span><h2>No service disruption on this route</h2><p>${route.name} is operating normally. You can continue to KL Sentral without a service-alert detour.</p></section><button class="primary-button full-width" style="margin-top:14px" data-go="commuter-journey">Return to journey progress</button>`;
   }
   const crowded = route.disruption === 'crowd';
-  return `${header('Service disruption', 'commuter-notifications')}<section class="disruption-card"><span class="tag">${crowded ? 'CROWD ALERT' : 'MINOR DELAY'}</span><h2>${crowded ? 'Busy near Bukit Bintang' : 'Kelana Jaya Line'}</h2><p>${crowded ? 'Vehicle occupancy is high near Bukit Bintang. Consider the suggested alternative for a more comfortable journey.' : 'Services are operating with an estimated 10-minute delay near Pasar Seni due to a signalling issue.'}</p><small>${crowded ? 'Updated 10:26 AM' : 'Started 10:14 AM · Updated 10:22 AM'}</small></section><button class="primary-button full-width" style="margin-top:14px" data-go="commuter-alternative">View alternative routes</button>`;
+  return `${header('Service disruption', 'commuter-journey')}<section class="disruption-card"><span class="tag">${crowded ? 'CROWD ALERT' : 'MINOR DELAY'}</span><h2>${crowded ? 'Busy near Bukit Bintang' : 'Kelana Jaya Line'}</h2><p>${crowded ? 'Vehicle occupancy is high near Bukit Bintang. Consider the suggested alternative for a more comfortable journey.' : 'Services are operating with an estimated 10-minute delay near Pasar Seni due to a signalling issue.'}</p><small>${crowded ? 'Updated 10:26 AM' : 'Started 10:14 AM · Updated 10:22 AM'}</small></section><button class="primary-button full-width" style="margin-top:14px" data-go="commuter-alternative">View alternative routes</button>`;
+}
+
+function commuterJourneyUpdates() {
+  const route = selectedRoute();
+  return `${header('Journey updates', 'commuter-journey')}<section class="list-card"><div class="notification-row is-unread"><span class="row-icon amber">${i('bus')}</span><div class="row-copy"><h3>${route.liveService}</h3><p>${route.liveDetail}</p></div><span class="time">Now</span></div><div class="notification-row"><span class="row-icon">${i('clock')}</span><div class="row-copy"><h3>Arrival estimate</h3><p>${route.next} is expected in ${route.countdown}.</p></div><span class="time">Live</span></div><div class="notification-row"><span class="row-icon ${route.disruption === 'none' ? '' : 'amber'}">${i('info')}</span><div class="row-copy"><h3>Service status</h3><p>${route.status}</p></div><span class="time">Updated</span></div></section>`;
 }
 
 function commuterAlternative() {
@@ -273,23 +338,24 @@ function commuterAlternative() {
 }
 
 function commuterProfile() {
-  return `${header('Profile', 'commuter-home')}<section class="list-card">${listRow('user','Yi Hern Chang','yihern@example.com','','')}</section><button class="soft-button full-width" style="margin-top:11px" data-go="commuter-preferences">${i('settings')} Journey preferences</button><h2 class="section-label">Personal details</h2><form class="form-stack" data-form="profile" novalidate>${formError()}${field('Name', 'text', '', 'Yi Hern Chang')}${field('Email address', 'email', '', 'yihern@example.com')}${field('Phone number', 'tel', '', '+60 12 345 6789')}<button class="primary-button full-width" type="submit">Save personal details</button></form><section class="profile-password-card"><h2>Password and security</h2><p>Enter your current password before replacing it with a new one.</p><form class="form-stack" data-form="profile-password" novalidate>${formError()}${field('Current password', 'password', 'Your current password', '', 'lock', { id: 'profile-current-password', toggle: true })}${field('New password', 'password', 'At least 8 characters', '', 'lock', { id: 'profile-new-password', toggle: true })}${field('Confirm new password', 'password', 'Re-enter new password', '', 'lock', { id: 'profile-confirm-password', match: 'profile-new-password', toggle: true })}<button class="secondary-button full-width" type="submit">Change password</button></form></section><button class="danger-button full-width" style="margin-top:15px" data-action="logout">${i('logout')} Log out</button>`;
+  return `${header('Profile', 'commuter-home')}<section class="list-card">${listRow('user','Yi Hern Chang','yihern@example.com','','')}</section><button class="soft-button full-width" style="margin-top:11px" data-go="commuter-preferences">${i('settings')} Journey preferences</button><h2 class="section-label">Personal details</h2><form class="form-stack" data-form="profile" novalidate>${formError()}${field('Name', 'text', '', 'Yi Hern Chang')}${field('Email address', 'email', '', 'yihern@example.com')}${field('Phone number', 'tel', '', '+60 12 345 6789')}<button class="primary-button full-width" type="submit">Save personal details</button></form><section class="profile-password-card"><h2>Password and security</h2><p>Enter your current password before replacing it with a new one.</p><form class="form-stack" data-form="profile-password" novalidate>${formError()}${field('Current password', 'password', 'Your current password', '', 'lock', { id: 'profile-current-password', toggle: true, notMatch: 'profile-new-password', notMatchMessage: 'Current password and new password must be different.' })}${field('New password', 'password', 'At least 8 characters', '', 'lock', { id: 'profile-new-password', toggle: true, notMatch: 'profile-current-password', notMatchMessage: 'New password must be different from current password.' })}${field('Confirm new password', 'password', 'Re-enter new password', '', 'lock', { id: 'profile-confirm-password', match: 'profile-new-password', toggle: true })}<button class="secondary-button full-width" type="submit">Change password</button></form></section><button class="danger-button full-width" style="margin-top:15px" data-action="logout">${i('logout')} Log out</button>`;
 }
 
 function commuterPreferences() {
-  return `${header('Journey preferences', 'commuter-profile')}<div class="form-stack">${selectField('Preferred mode', ['Rail and bus', 'Rail only', 'Bus only'])}${selectField('Route priority', ['Best balance', 'Lowest fare', 'Fastest route'])}</div><section class="list-card" style="margin-top:15px"><div class="switch-row"><div><h3>Avoid transfers</h3><p>Prioritise routes with fewer changes.</p></div><button class="toggle ${state.toggles.transfers ? 'is-on' : ''}" data-toggle="transfers" aria-label="Toggle avoid transfers"></button></div><div class="switch-row"><div><h3>Accessibility needs</h3><p>Prioritise accessible stations and routes.</p></div><button class="toggle ${state.toggles.accessible ? 'is-on' : ''}" data-toggle="accessible" aria-label="Toggle accessibility"></button></div><div class="switch-row"><div><h3>Journey alerts</h3><p>Receive travel updates for active journeys.</p></div><button class="toggle ${state.toggles.alerts ? 'is-on' : ''}" data-toggle="alerts" aria-label="Toggle alerts"></button></div></section><button class="primary-button full-width" style="margin-top:15px" data-action="preferences-save" data-go="commuter-profile">Save preferences</button>`;
+  return `${header('Journey preferences', 'commuter-home')}<div class="form-stack">${selectField('Preferred mode', ['Rail and bus', 'Rail only', 'Bus only'])}${selectField('Route priority', ['Best balance', 'Lowest fare', 'Fastest route'])}</div><section class="list-card" style="margin-top:15px"><div class="switch-row"><div><h3>Avoid transfers</h3><p>Prioritise routes with fewer changes.</p></div><button class="toggle ${state.toggles.transfers ? 'is-on' : ''}" data-toggle="transfers" aria-label="Toggle avoid transfers"></button></div><div class="switch-row"><div><h3>Accessibility needs</h3><p>Prioritise accessible stations and routes.</p></div><button class="toggle ${state.toggles.accessible ? 'is-on' : ''}" data-toggle="accessible" aria-label="Toggle accessibility"></button></div><div class="switch-row"><div><h3>Journey alerts</h3><p>Receive travel updates for active journeys.</p></div><button class="toggle ${state.toggles.alerts ? 'is-on' : ''}" data-toggle="alerts" aria-label="Toggle alerts"></button></div></section><button class="primary-button full-width" style="margin-top:15px" data-action="preferences-save" data-go="commuter-home">Save preferences</button>`;
 }
 
 function commuterContent() {
   const pages = {
-    'commuter-auth': commuterAuth, 'commuter-register': commuterRegister, 'commuter-reset': commuterReset, 'commuter-home': commuterHome,
+    'commuter-auth': commuterAuth, 'commuter-register': commuterRegister, 'commuter-reset-password': commuterResetPassword, 'commuter-home': commuterHome,
     'commuter-route-plan': commuterRoutePlan, 'commuter-route-results': commuterRouteResults, 'commuter-save-favourite': commuterSaveFavourite, 'commuter-favourites': commuterFavourites,
-    'commuter-live-map': commuterLiveMap, 'commuter-journey': commuterJourney, 'commuter-countdown': commuterCountdown, 'commuter-crowd': commuterCrowd, 'commuter-occupancy': commuterOccupancy,
+    'commuter-live-map': commuterLiveMap, 'commuter-journey': commuterJourney, 'commuter-journey-updates': commuterJourneyUpdates, 'commuter-countdown': commuterCountdown, 'commuter-crowd': commuterCrowd, 'commuter-occupancy': commuterOccupancy,
     'commuter-wallet': commuterWallet, 'commuter-topup': commuterTopup, 'commuter-transactions': commuterTransactions, 'commuter-ticket': commuterTicket, 'commuter-scan': commuterScan, 'commuter-payment': commuterPayment, 'commuter-refund': commuterRefund,
     'commuter-loyalty': commuterLoyalty, 'commuter-earned': commuterEarned, 'commuter-rewards': commuterRewards, 'commuter-notifications': commuterNotifications, 'commuter-disruption': commuterDisruption, 'commuter-alternative': commuterAlternative, 'commuter-profile': commuterProfile, 'commuter-preferences': commuterPreferences,
   };
-  const auth = ['commuter-auth', 'commuter-register', 'commuter-reset'].includes(state.screen);
-  const navigation = state.screen.includes('route') ? 'plan' : state.screen.includes('wallet') || ['commuter-topup','commuter-transactions','commuter-ticket','commuter-payment','commuter-refund'].includes(state.screen) ? 'wallet' : state.screen.includes('profile') || state.screen.includes('preferences') ? 'profile' : 'home';
+  const auth = ['commuter-auth', 'commuter-register', 'commuter-reset-password'].includes(state.screen);
+  const planScreens = ['commuter-route-plan', 'commuter-route-results', 'commuter-save-favourite', 'commuter-favourites', 'commuter-journey', 'commuter-journey-updates', 'commuter-disruption', 'commuter-alternative'];
+  const navigation = planScreens.includes(state.screen) ? 'plan' : state.screen.includes('wallet') || ['commuter-topup','commuter-transactions','commuter-ticket','commuter-payment','commuter-refund','commuter-earned'].includes(state.screen) ? 'wallet' : state.screen.includes('profile') || state.screen.includes('preferences') ? 'profile' : 'home';
   return `<div class="app-screen commuter">${statusbar()}<main class="screen-main ${auth ? 'no-bottom-nav' : ''}">${(pages[state.screen] || commuterHome)()}</main>${auth ? '' : bottomNav(navigation)}${toast()}</div>`;
 }
 
@@ -365,8 +431,9 @@ document.addEventListener('click', (event) => {
   const roleButton = event.target.closest('[data-role]');
   if (roleButton) {
     state.role = roleButton.dataset.role;
-    state.screen = state.role === 'commuter' ? 'commuter-auth' : state.role === 'admin' ? 'admin-login' : 'operator-login';
+    navigateTo(state.role === 'commuter' ? 'commuter-auth' : state.role === 'admin' ? 'admin-login' : 'operator-login', { clearHistory: true });
     state.toast = '';
+    state.resetModalOpen = false;
     render();
     return;
   }
@@ -380,6 +447,12 @@ document.addEventListener('click', (event) => {
     }
     return;
   }
+  const back = event.target.closest('[data-back]');
+  if (back) {
+    state.screen = state.history.pop() || back.dataset.back;
+    render();
+    return;
+  }
   const route = event.target.closest('[data-route]');
   if (route) state.selectedRoute = route.dataset.route;
   const preference = event.target.closest('[data-preference]');
@@ -389,16 +462,26 @@ document.addEventListener('click', (event) => {
     render();
     return;
   }
+  const routeFilter = event.target.closest('[data-route-filter]');
+  if (routeFilter) { state.activeFilter = routeFilter.dataset.routeFilter; render(); return; }
+  const rewardFilter = event.target.closest('[data-reward-filter]');
+  if (rewardFilter) { state.rewardFilter = rewardFilter.dataset.rewardFilter; render(); return; }
+  const transactionFilter = event.target.closest('[data-transaction-filter]');
+  if (transactionFilter) { state.transactionFilter = transactionFilter.dataset.transactionFilter; render(); return; }
   const go = event.target.closest('[data-go]');
   if (go) {
     const needsToast = go.dataset.action;
-    state.screen = go.dataset.go;
+    if (go.dataset.go === 'commuter-topup' && state.screen !== 'commuter-topup') {
+      state.selectedAmount = '';
+      state.topupManualAmount = '';
+    }
+    navigateTo(go.dataset.go);
     if (needsToast) state.toast = actionMessages[needsToast] || '';
     render();
     return;
   }
   const amount = event.target.closest('[data-amount]');
-  if (amount) { state.selectedAmount = amount.dataset.amount; render(); return; }
+  if (amount) { state.selectedAmount = amount.dataset.amount; state.topupManualAmount = ''; render(); return; }
   const filter = event.target.closest('[data-filter]');
   if (filter) { state.activeFilter = filter.dataset.filter; render(); return; }
   const toggle = event.target.closest('[data-toggle]');
@@ -407,15 +490,17 @@ document.addEventListener('click', (event) => {
   if (action) {
     const name = action.dataset.action;
     if (name === 'dismiss-toast') { state.toast = ''; render(); return; }
+    if (name === 'open-reset-modal') { state.resetModalOpen = true; render(); return; }
+    if (name === 'close-reset-modal') { state.resetModalOpen = false; render(); return; }
     if (name === 'filter') { action.classList.toggle('is-active'); return; }
     if (name === 'save-route') {
       if (!state.favourites.includes(state.selectedRoute)) state.favourites.push(state.selectedRoute);
-      state.screen = 'commuter-favourites';
+      navigateTo('commuter-favourites');
       showToast('Route saved to your favourites.');
       return;
     }
     if (name === 'logout') {
-      state.screen = state.role === 'commuter' ? 'commuter-auth' : state.role === 'admin' ? 'admin-login' : 'operator-login';
+      navigateTo(state.role === 'commuter' ? 'commuter-auth' : state.role === 'admin' ? 'admin-login' : 'operator-login', { clearHistory: true });
       showToast('You have been logged out.');
       return;
     }
@@ -451,7 +536,31 @@ function validationMessage(input) {
     const matching = document.getElementById(input.dataset.match);
     if (matching && value !== matching.value) return 'Passwords do not match. Please type the same password again.';
   }
+  if (input.dataset.notMatch) {
+    const matching = document.getElementById(input.dataset.notMatch);
+    if (matching && matching.value && value === matching.value) return input.dataset.notMatchMessage;
+  }
   return '';
+}
+
+function validateTopupChoice(form) {
+  const manualInput = form.querySelector('#topup-amount');
+  const manualAmount = state.topupManualAmount.trim();
+  const summary = form.querySelector('.form-error');
+  if (!state.selectedAmount && !manualAmount) {
+    setFieldError(manualInput, 'Choose a quick amount or type an amount.');
+    if (summary) { summary.hidden = false; summary.textContent = 'Choose a top-up amount before continuing.'; }
+    manualInput.focus();
+    return false;
+  }
+  if (manualAmount && (Number(manualAmount) <= 0 || Number.isNaN(Number(manualAmount)))) {
+    setFieldError(manualInput, 'Type an amount greater than 0.');
+    if (summary) { summary.hidden = false; summary.textContent = 'Enter a valid top-up amount before continuing.'; }
+    manualInput.focus();
+    return false;
+  }
+  setFieldError(manualInput, '');
+  return true;
 }
 
 function validateForm(form) {
@@ -474,8 +583,9 @@ function validateForm(form) {
 function completeForm(formName) {
   const destinations = {
     'commuter-login': ['commuter-home', 'Welcome back to UniMove.'],
-    'commuter-register': ['commuter-home', 'Account created successfully.'],
-    'commuter-reset': ['commuter-auth', 'Password updated. Please log in with your new password.'],
+    'commuter-register': ['commuter-auth', 'Account created successfully. Please log in.'],
+    'commuter-reset-verify': ['commuter-reset-password', 'Email verified. Create your new password.'],
+    'commuter-reset-password': ['commuter-auth', 'Password updated. Please log in with your new password.'],
     'route-plan': ['commuter-route-results', 'Route options are ready.'],
     'topup': ['commuter-wallet', 'Top-up confirmed. Your wallet balance is updated locally.'],
     'refund': ['commuter-wallet', 'Refund request submitted for review.'],
@@ -489,8 +599,9 @@ function completeForm(formName) {
     'operator-feed': ['operator-feed', 'Live operator data pushed to UniMove.'],
     'operator-alerts': ['operator-alerts', 'Service alert published for commuters.'],
   };
+  if (formName === 'commuter-reset-verify') state.resetModalOpen = false;
   const [screen, message] = destinations[formName] || [state.screen, 'Saved in this prototype.'];
-  state.screen = screen;
+  navigateTo(screen);
   showToast(message);
 }
 
@@ -499,10 +610,23 @@ document.addEventListener('submit', (event) => {
   if (!form) return;
   event.preventDefault();
   if (!validateForm(form)) return;
+  if (form.dataset.form === 'topup' && !validateTopupChoice(form)) return;
   completeForm(form.dataset.form);
 });
 
+document.addEventListener('change', (event) => {
+  const stateKey = event.target.dataset.stateKey;
+  if (!stateKey) return;
+  state[stateKey] = event.target.value;
+  render();
+});
+
 document.addEventListener('input', (event) => {
+  if (event.target.matches('[data-topup-manual]')) {
+    state.topupManualAmount = event.target.value;
+    state.selectedAmount = '';
+    document.querySelectorAll('[data-amount]').forEach(button => button.classList.remove('is-active'));
+  }
   if (!event.target.matches('[data-validate]')) return;
   const message = validationMessage(event.target);
   setFieldError(event.target, message);

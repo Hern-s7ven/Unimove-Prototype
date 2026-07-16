@@ -288,3 +288,25 @@ button { cursor: pointer; }
 .profile-password-card { margin-top: 15px; padding: 15px; background: #f6f3ff; border: 1px solid #e0d9fb; border-radius: 17px; }.profile-password-card h2 { margin: 0 0 4px; font-size: 14px; color: var(--navy); }.profile-password-card p { margin: 0 0 14px; color: var(--muted); font-size: 10px; }
 .route-summary { background: #f5f2ff; border: 1px solid #ded5ff; border-radius: 18px; padding: 15px; }.route-summary h2 { margin: 0; color: var(--navy); font-size: 17px; }.route-summary p { color: var(--muted); font-size: 11px; margin: 5px 0 0; }.route-summary .route-meta { margin-top: 14px; }
 .clear-status { background: #ecf8f5; border: 1px solid #c8e9df; color: #17665c; border-radius: 18px; padding: 17px; }.clear-status h2 { margin: 8px 0 5px; font-size: 16px; }.clear-status p { margin: 0; font-size: 11px; line-height: 1.5; }
+
+/* Interaction fixes for account recovery, route planning, and commuter data views. */
+.modal-overlay { position: absolute; z-index: 30; inset: 0; display: grid; align-items: end; padding: 18px; background: rgba(12, 8, 48, .56); backdrop-filter: blur(4px); }
+.modal-card { position: relative; width: 100%; padding: 24px 18px 20px; border: 1px solid #ddd5ff; border-radius: 24px; background: white; box-shadow: 0 20px 50px rgba(10, 6, 55, .3); }
+.modal-card h2 { margin: 0; color: var(--navy); font-size: 20px; letter-spacing: -.04em; }.modal-card > p { margin: 6px 0 18px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.modal-close { position: absolute; top: 12px; right: 12px; display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: #f8f7ff; }.modal-close svg { width: 17px; height: 17px; }
+.input-hint { margin: 7px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
+
+.route-input-group { gap: 10px; padding-left: 31px; }
+.route-input-group::before { top: 33px; bottom: 33px; left: 10px; height: auto; border-left-color: #9a84ed; }
+.route-input-group::after { display: none; }
+.route-input-group .form-field { position: relative; }
+.route-input-group .form-field::before { position: absolute; z-index: 2; left: -27px; top: 31px; width: 10px; height: 10px; content: ""; border: 2px solid white; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 1px #8b73e5; }
+.route-input-group .form-field:last-child::before { background: var(--amber); box-shadow: 0 0 0 1px #d99d32; }
+
+.map-route-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.map-road { fill: none; stroke: rgba(255,255,255,.88); stroke-width: 15; stroke-linecap: round; }
+.map-route-path { fill: none; stroke: var(--teal); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.map-route { display: none; }
+.map-pin { transform: translate(-50%, -100%) rotate(-45deg); }.map-pin.start { left: 14.4%; top: 21%; }.map-pin.bus { left: 48.8%; top: 45.8%; }.map-pin.end { right: auto; left: 85.3%; top: 76.2%; }
+
+.ticket-qr-image { display: block; width: 204px; height: 204px; margin: 13px auto; padding: 10px; border: 10px solid #f1f6f5; background: white; image-rendering: pixelated; }
