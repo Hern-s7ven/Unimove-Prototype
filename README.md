@@ -4,6 +4,8 @@ UniMove is an interactive front-end prototype for a university public-transport 
 
 This project is a visual and interaction prototype only. It does not connect to a database, process real payments, or send live transport data.
 
+The prototype keeps its wallet, loyalty, feed, alert, and admin changes only while the browser page remains open. Refreshing the page resets the demonstration data. Login checks validate the form format for the interface, but do not provide real account authentication or access control because this project has no backend service.
+
 ## Features
 
 - Role-based commuter, administrator, and transport-operator portals
