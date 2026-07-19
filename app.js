@@ -16,6 +16,7 @@ const state = {
   selectedVehicle: 'KJ5 · Kelana Jaya Line',
   rewardFilter: 'All rewards',
   transactionFilter: 'All',
+  profile: { name: 'Yi Hern Chang', email: 'yihern@example.com', phone: '+60 12 345 6789' },
   walletBalance: 18.40,
   loyaltyPoints: 1240,
   lastPaymentConfirmed: false,
@@ -341,7 +342,7 @@ function commuterHome() {
     ['route','Plan route','Fares & options','commuter-route-plan'], ['map','Live tracking','Vehicles nearby','commuter-live-map'], ['wallet','Wallet',formatMoney(state.walletBalance),'commuter-wallet'],
     ['star','Loyalty',`${state.loyaltyPoints.toLocaleString()} points`,'commuter-loyalty'], ['bell','Notifications',`${visibleNotifications().length} new`,'commuter-notifications'], ['user','Profile','Preferences','commuter-profile'],
   ];
-  return `<div class="home-topbar"><div class="brand-mini">${logo('logo-small')}<span>UniMove</span></div><div class="top-actions"><button class="icon-button" data-go="commuter-notifications" aria-label="Notifications">${i('bell')}</button><button class="icon-button" data-go="commuter-preferences" aria-label="Settings">${i('settings')}</button></div></div><div class="home-greeting"><p class="micro">Tuesday, 14 July</p><h1>Good morning, <span>Yi Hern.</span></h1></div>
+  return `<div class="home-topbar"><div class="brand-mini">${logo('logo-small')}<span>UniMove</span></div><div class="top-actions"><button class="icon-button" data-go="commuter-notifications" aria-label="Notifications">${i('bell')}</button><button class="icon-button" data-go="commuter-preferences" aria-label="Settings">${i('settings')}</button></div></div><div class="home-greeting"><p class="micro">Tuesday, 14 July</p><h1>Good morning, <span>${state.profile.name}.</span></h1></div>
     <section class="journey-card"><span class="card-eyebrow">NEXT JOURNEY</span><h2>Plan your next trip</h2><div class="journey-points"><b>${i('route')}</b><span>Compare multi-modal routes and live fares.</span></div></section>
     <h2 class="section-label">Explore UniMove</h2><section class="action-grid">${tiles.map(([icon,title,sub,target]) => `<button class="action-tile" data-go="${target}">${i(icon)}<span>${title}</span><span class="tile-sub">${sub}</span></button>`).join('')}</section>
     <section class="list-card" style="margin-top:14px">${actionRow('star', 'Favourite routes', `${state.favourites.length} saved route${state.favourites.length === 1 ? '' : 's'} · open journey progress`, 'commuter-favourites', 'purple')}</section>
@@ -476,7 +477,8 @@ function commuterAlternative() {
 }
 
 function commuterProfile() {
-  return `${header('Profile', 'commuter-home')}<section class="list-card">${listRow('user','Yi Hern Chang','yihern@example.com','','')}</section><button class="soft-button full-width" style="margin-top:11px" data-go="commuter-preferences">${i('settings')} Journey preferences</button><h2 class="section-label">Personal details</h2><form class="form-stack" data-form="profile" novalidate>${formError()}${field('Name', 'text', '', 'Yi Hern Chang')}${field('Email address', 'email', '', 'yihern@example.com')}${field('Phone number', 'tel', '', '+60 12 345 6789')}<button class="primary-button full-width" type="submit">Save personal details</button></form><section class="profile-password-card"><h2>Password and security</h2><p>Enter your current password before replacing it with a new one.</p><form class="form-stack" data-form="profile-password" novalidate>${formError()}${field('Current password', 'password', 'Your current password', '', 'lock', { id: 'profile-current-password', toggle: true, notMatch: 'profile-new-password', notMatchMessage: 'Current password and new password must be different.' })}${field('New password', 'password', 'At least 8 characters', '', 'lock', { id: 'profile-new-password', toggle: true, notMatch: 'profile-current-password', notMatchMessage: 'New password must be different from current password.' })}${field('Confirm new password', 'password', 'Re-enter new password', '', 'lock', { id: 'profile-confirm-password', match: 'profile-new-password', toggle: true })}<button class="secondary-button full-width" type="submit">Change password</button></form></section><button class="danger-button full-width" style="margin-top:15px" data-action="logout">${i('logout')} Log out</button>`;
+  const profile = state.profile;
+  return `${header('Profile', 'commuter-home')}<section class="list-card">${listRow('user',profile.name,profile.email,'','')}</section><button class="soft-button full-width" style="margin-top:11px" data-go="commuter-preferences">${i('settings')} Journey preferences</button><h2 class="section-label">Personal details</h2><form class="form-stack" data-form="profile" novalidate>${formError()}${field('Name', 'text', '', profile.name)}${field('Email address', 'email', '', profile.email)}${field('Phone number', 'tel', '', profile.phone)}<button class="primary-button full-width" type="submit">Save personal details</button></form><section class="profile-password-card"><h2>Password and security</h2><p>Enter your current password before replacing it with a new one.</p><form class="form-stack" data-form="profile-password" novalidate>${formError()}${field('Current password', 'password', 'Your current password', '', 'lock', { id: 'profile-current-password', toggle: true, notMatch: 'profile-new-password', notMatchMessage: 'Current password and new password must be different.' })}${field('New password', 'password', 'At least 8 characters', '', 'lock', { id: 'profile-new-password', toggle: true, notMatch: 'profile-current-password', notMatchMessage: 'New password must be different from current password.' })}${field('Confirm new password', 'password', 'Re-enter new password', '', 'lock', { id: 'profile-confirm-password', match: 'profile-new-password', toggle: true })}<button class="secondary-button full-width" type="submit">Change password</button></form></section><button class="danger-button full-width" style="margin-top:15px" data-action="logout">${i('logout')} Log out</button>`;
 }
 
 function commuterPreferences() {
@@ -790,6 +792,13 @@ function completeForm(formName, form) {
     'operator-alerts': ['operator-alerts', 'Service alert published for commuters.'],
   };
   const data = new FormData(form);
+  if (formName === 'profile') {
+    state.profile = {
+      name: data.get('name').trim(),
+      email: data.get('email-address').trim(),
+      phone: data.get('phone-number').trim(),
+    };
+  }
   if (formName === 'topup') {
     const amount = Number((state.selectedAmount || state.topupManualAmount).replace(/[^0-9.]/g, ''));
     const method = data.get('payment-method') || 'Online banking';
