@@ -187,6 +187,65 @@ function activeOperatorAlert() {
   return state.operatorAlert.status !== 'No active alert';
 }
 
+const primaryServiceByRoute = {
+  'mrt-lrt': 'Kelana Jaya Line',
+  'brt-lrt': 'BRT Sunway Line',
+  'bus-mrt': 'Kajang Line',
+};
+
+function serviceUpdateRouteId() {
+  return Object.entries(primaryServiceByRoute).find(([, service]) => service === state.operatorAlert.service)?.[0] || 'mrt-lrt';
+}
+
+function operatorAlertAffectsRoute(route) {
+  return activeOperatorAlert() && state.operatorAlert.service === primaryServiceByRoute[route.id];
+}
+
+function routeServiceCondition(route = selectedRoute()) {
+  if (operatorAlertAffectsRoute(route)) {
+    return {
+      active: true,
+      tag: state.operatorAlert.status.toUpperCase(),
+      title: state.operatorAlert.service,
+      detail: state.operatorAlert.message,
+      timing: `Expected delay · ${state.operatorAlert.delay}`,
+      status: `${state.operatorAlert.status} on ${state.operatorAlert.service}`,
+      tone: 'red',
+    };
+  }
+  if (route.disruption === 'none') {
+    return {
+      active: false,
+      tag: 'ALL CLEAR',
+      title: 'No service disruption on this route',
+      detail: `${route.name} is operating normally. You can continue to KL Sentral without a service-alert detour.`,
+      timing: 'Live status · operating normally',
+      status: 'No disruption reported',
+      tone: '',
+    };
+  }
+  if (route.disruption === 'crowd') {
+    return {
+      active: true,
+      tag: 'CROWD ALERT',
+      title: 'Busy near Bukit Bintang',
+      detail: 'Vehicle occupancy is high near Bukit Bintang. Consider the suggested alternative for a more comfortable journey.',
+      timing: 'Updated 10:26 AM',
+      status: 'Crowded near Bukit Bintang',
+      tone: 'amber',
+    };
+  }
+  return {
+    active: true,
+    tag: 'MINOR DELAY',
+    title: 'Kelana Jaya Line',
+    detail: 'Services are operating with an estimated 10-minute delay near Pasar Seni due to a signalling issue.',
+    timing: 'Started 10:14 AM · Updated 10:22 AM',
+    status: 'Minor delay near Pasar Seni',
+    tone: 'red',
+  };
+}
+
 function currentStationData(station = state.selectedStation) {
   const base = stationLiveData[station];
   if (station !== 'Pasar Seni station') return base;
@@ -216,7 +275,18 @@ function visibleNotifications() {
     { icon: 'wallet', tone: 'purple', title: 'Low balance', detail: `Your wallet balance is ${formatMoney(state.walletBalance)}.`, time: '1h', unread: false },
     { icon: 'star', tone: '', title: 'Points balance', detail: `${state.loyaltyPoints.toLocaleString()} points are ready to redeem.`, time: 'Yesterday', unread: false },
   ];
-  if (activeOperatorAlert()) notifications.unshift({ icon: 'info', tone: 'red', title: state.operatorAlert.status, detail: state.operatorAlert.message, time: 'Now', unread: true });
+  const serviceAlerts = Object.values(routeOptions)
+    .map(route => ({ route, condition: routeServiceCondition(route) }))
+    .filter(({ condition }) => condition.active)
+    .map(({ route, condition }) => ({
+      icon: 'info',
+      tone: condition.tone,
+      title: condition.tag === 'CROWD ALERT' ? 'Crowd alert' : 'Service disruption',
+      detail: `${route.name} · ${condition.status}`,
+      time: 'Now',
+      unread: true,
+    }));
+  notifications.unshift(...serviceAlerts);
   const station = currentStationData();
   if (station.crowd >= 70) notifications.push({ icon: 'clock', tone: 'amber', title: 'Peak-hour alert', detail: `${state.selectedStation} is busy. Travel after 8:30 AM if possible.`, time: 'Now', unread: false });
   return notifications;
@@ -274,7 +344,7 @@ function commuterHome() {
   return `<div class="home-topbar"><div class="brand-mini">${logo('logo-small')}<span>UniMove</span></div><div class="top-actions"><button class="icon-button" data-go="commuter-notifications" aria-label="Notifications">${i('bell')}</button><button class="icon-button" data-go="commuter-preferences" aria-label="Settings">${i('settings')}</button></div></div><div class="home-greeting"><p class="micro">Tuesday, 14 July</p><h1>Good morning, <span>Yi Hern.</span></h1></div>
     <section class="journey-card"><span class="card-eyebrow">NEXT JOURNEY</span><h2>Plan your next trip</h2><div class="journey-points"><b>${i('route')}</b><span>Compare multi-modal routes and live fares.</span></div></section>
     <h2 class="section-label">Explore UniMove</h2><section class="action-grid">${tiles.map(([icon,title,sub,target]) => `<button class="action-tile" data-go="${target}">${i(icon)}<span>${title}</span><span class="tile-sub">${sub}</span></button>`).join('')}</section>
-    <button class="home-live-card" type="button" data-action="home-live-arrival" data-go="commuter-countdown"><span class="live-orb">${i('bus')}</span><span><h3>Live now · KJ5 is 2 minutes away</h3><p>Passenger crowd at Pasar Seni is moderate. Track the next arrival before you leave.</p></span>${i('chevron')}</button><h2 class="section-label">Quick journey preferences</h2><div class="preference-choice-grid">${['Lowest fare','Fastest route','Avoid transfers','Avoid crowded services','Accessible route'].map(pref => `<button class="preference-choice ${state.homePreferences.has(pref) ? 'is-active' : ''}" data-preference="${pref}">${pref}</button>`).join('')}</div><button class="alert-strip" data-go="commuter-disruption">${i('info')}<span><strong>Service update</strong><br />${activeOperatorAlert() ? state.operatorAlert.message : 'No active service disruption.'}</span></button>`;
+    <button class="home-live-card" type="button" data-action="home-live-arrival" data-go="commuter-countdown"><span class="live-orb">${i('bus')}</span><span><h3>Live now · KJ5 is 2 minutes away</h3><p>Passenger crowd at Pasar Seni is moderate. Track the next arrival before you leave.</p></span>${i('chevron')}</button><h2 class="section-label">Quick journey preferences</h2><div class="preference-choice-grid">${['Lowest fare','Fastest route','Avoid transfers','Avoid crowded services','Accessible route'].map(pref => `<button class="preference-choice ${state.homePreferences.has(pref) ? 'is-active' : ''}" data-preference="${pref}">${pref}</button>`).join('')}</div><button class="alert-strip" data-action="show-service-update" data-go="commuter-disruption">${i('info')}<span><strong>Service update</strong><br />${activeOperatorAlert() ? state.operatorAlert.message : 'No active service disruption.'}</span></button>`;
 }
 
 function commuterRoutePlan() {
@@ -378,20 +448,21 @@ function commuterRewards() {
 
 function commuterNotifications() {
   const notifications = visibleNotifications();
-  return `${header('Notifications', 'commuter-home')}<div class="list-card">${notifications.length ? notifications.map(notification => `<div class="notification-row ${notification.unread ? 'is-unread' : ''}"><span class="row-icon ${notification.tone}">${i(notification.icon)}</span><div class="row-copy"><h3>${notification.title}</h3><p>${notification.detail}</p></div><span class="time">${notification.time}</span></div>`).join('') : '<div class="empty-state"><h2>You are all caught up</h2><p>New journey, wallet, and service updates will appear here.</p></div>'}</div>${notifications.length ? '<button class="secondary-button full-width" style="margin-top:15px" data-action="clear-notifications">Clear notifications</button>' : ''}${activeOperatorAlert() ? '<button class="danger-button full-width" style="margin-top:10px" data-go="commuter-disruption">View disruption alert</button>' : ''}`;
+  return `${header('Notifications', 'commuter-home')}<div class="list-card">${notifications.length ? notifications.map(notification => `<div class="notification-row ${notification.unread ? 'is-unread' : ''}"><span class="row-icon ${notification.tone}">${i(notification.icon)}</span><div class="row-copy"><h3>${notification.title}</h3><p>${notification.detail}</p></div><span class="time">${notification.time}</span></div>`).join('') : '<div class="empty-state"><h2>You are all caught up</h2><p>New journey, wallet, and service updates will appear here.</p></div>'}</div>${notifications.length ? '<button class="secondary-button full-width" style="margin-top:15px" data-action="clear-notifications">Clear notifications</button>' : ''}${activeOperatorAlert() ? '<button class="danger-button full-width" style="margin-top:10px" data-action="show-service-update" data-go="commuter-disruption">View disruption alert</button>' : ''}`;
 }
 
 function commuterDisruption() {
-  const alert = state.operatorAlert;
-  if (!activeOperatorAlert()) {
-    return `${header('Service disruption', 'commuter-journey')}<section class="clear-status"><span class="tag teal">ALL CLEAR</span><h2>No active service disruption</h2><p>Operator feeds show that the selected service is operating normally.</p></section><button class="primary-button full-width" style="margin-top:14px" data-go="commuter-journey">Return to journey progress</button>`;
+  const condition = routeServiceCondition();
+  if (!condition.active) {
+    return `${header('Service disruption', 'commuter-journey')}<section class="clear-status"><span class="tag teal">${condition.tag}</span><h2>${condition.title}</h2><p>${condition.detail}</p></section><button class="primary-button full-width" style="margin-top:14px" data-go="commuter-journey">Return to journey progress</button>`;
   }
-  return `${header('Service disruption', 'commuter-journey')}<section class="disruption-card"><span class="tag">${alert.status.toUpperCase()}</span><h2>${alert.service}</h2><p>${alert.message}</p><small>Expected delay · ${alert.delay}</small></section><button class="primary-button full-width" style="margin-top:14px" data-go="commuter-alternative">View alternative routes</button>`;
+  return `${header('Service disruption', 'commuter-journey')}<section class="disruption-card ${condition.tone === 'amber' ? 'is-crowd' : ''}"><span class="tag">${condition.tag}</span><h2>${condition.title}</h2><p>${condition.detail}</p><small>${condition.timing}</small></section><button class="primary-button full-width" style="margin-top:14px" data-go="commuter-alternative">View alternative routes</button>`;
 }
 
 function commuterJourneyUpdates() {
   const route = selectedRoute();
-  return `${header('Journey updates', 'commuter-journey')}<section class="list-card"><div class="notification-row is-unread"><span class="row-icon amber">${i('bus')}</span><div class="row-copy"><h3>${route.liveService}</h3><p>${route.liveDetail}</p></div><span class="time">Now</span></div><div class="notification-row"><span class="row-icon">${i('clock')}</span><div class="row-copy"><h3>Arrival estimate</h3><p>${route.next} is expected in ${route.countdown}.</p></div><span class="time">Live</span></div><div class="notification-row"><span class="row-icon ${route.disruption === 'none' ? '' : 'amber'}">${i('info')}</span><div class="row-copy"><h3>Service status</h3><p>${route.status}</p></div><span class="time">Updated</span></div></section>`;
+  const condition = routeServiceCondition(route);
+  return `${header('Journey updates', 'commuter-journey')}<section class="list-card"><div class="notification-row is-unread"><span class="row-icon amber">${i('bus')}</span><div class="row-copy"><h3>${route.liveService}</h3><p>${route.liveDetail}</p></div><span class="time">Now</span></div><div class="notification-row"><span class="row-icon">${i('clock')}</span><div class="row-copy"><h3>Arrival estimate</h3><p>${route.next} is expected in ${route.countdown}.</p></div><span class="time">Live</span></div><div class="notification-row"><span class="row-icon ${condition.tone}">${i('info')}</span><div class="row-copy"><h3>Service status</h3><p>${condition.status}</p></div><span class="time">Updated</span></div></section>`;
 }
 
 function commuterAlternative() {
@@ -399,7 +470,7 @@ function commuterAlternative() {
     { id: 'brt-lrt', name: 'MRT + BRT', detail: 'Use the MRT Kajang Line via Pasar Seni', duration: '11:44 AM', fare: 'RM 4.20', transfers: '1', tag: 'Recommended', recommended: true, progress: 43, next: 'Muzium Negara', disruption: 'none' },
     { id: 'bus-mrt', name: 'BRT + bus', detail: 'Use BRT Sunway Line toward KL Sentral', duration: '11:58 AM', fare: 'RM 3.80', transfers: '1', tag: 'Low fare', recommended: false, progress: 57, next: 'USJ 7', disruption: 'none' },
   ];
-  const hasAlternatives = activeOperatorAlert();
+  const hasAlternatives = routeServiceCondition().active;
   return `${header('Alternative routes', 'commuter-disruption')}<section class="route-hero"><h2>${hasAlternatives ? 'Keep moving.' : 'No alternate route needed.'}</h2><p>${hasAlternatives ? 'We found these options while the current service update is active.' : 'Your selected service is operating normally.'}</p></section>${hasAlternatives ? alternativeRoutes.map(routeCard).join('') : '<div class="empty-state"><h2>No alternative routes available</h2><p>There are no active disruptions requiring a detour right now.</p></div>'}`;
 }
 
@@ -545,6 +616,7 @@ document.addEventListener('click', (event) => {
   if (go) {
     const needsToast = go.dataset.action;
     if (needsToast === 'home-live-arrival') state.selectedStation = 'Pasar Seni station';
+    if (needsToast === 'show-service-update') state.selectedRoute = serviceUpdateRouteId();
     if (needsToast === 'payment') {
       state.lastPaymentConfirmed = true;
       state.walletBalance = Math.max(0, state.walletBalance - 2.70);
