@@ -45,7 +45,7 @@ const state = {
   reportRevision: 0,
   performance: { serverLoad: 42, uptime: '99.98%', responseTime: 186, failedFeeds: 1, paymentErrors: 0 },
   toggles: { transfers: true, accessible: false, alerts: true },
-  homePreferences: new Set(['Avoid crowded services', 'Lowest fare']),
+  routePriority: 'Lowest fare',
 };
 
 const icons = {
@@ -344,7 +344,8 @@ function commuterHome() {
   return `<div class="home-topbar"><div class="brand-mini">${logo('logo-small')}<span>UniMove</span></div><div class="top-actions"><button class="icon-button" data-go="commuter-notifications" aria-label="Notifications">${i('bell')}</button><button class="icon-button" data-go="commuter-preferences" aria-label="Settings">${i('settings')}</button></div></div><div class="home-greeting"><p class="micro">Tuesday, 14 July</p><h1>Good morning, <span>Yi Hern.</span></h1></div>
     <section class="journey-card"><span class="card-eyebrow">NEXT JOURNEY</span><h2>Plan your next trip</h2><div class="journey-points"><b>${i('route')}</b><span>Compare multi-modal routes and live fares.</span></div></section>
     <h2 class="section-label">Explore UniMove</h2><section class="action-grid">${tiles.map(([icon,title,sub,target]) => `<button class="action-tile" data-go="${target}">${i(icon)}<span>${title}</span><span class="tile-sub">${sub}</span></button>`).join('')}</section>
-    <button class="home-live-card" type="button" data-action="home-live-arrival" data-go="commuter-countdown"><span class="live-orb">${i('bus')}</span><span><h3>Live now · KJ5 is 2 minutes away</h3><p>Passenger crowd at Pasar Seni is moderate. Track the next arrival before you leave.</p></span>${i('chevron')}</button><h2 class="section-label">Quick journey preferences</h2><div class="preference-choice-grid">${['Lowest fare','Fastest route','Avoid transfers','Avoid crowded services','Accessible route'].map(pref => `<button class="preference-choice ${state.homePreferences.has(pref) ? 'is-active' : ''}" data-preference="${pref}">${pref}</button>`).join('')}</div><button class="alert-strip" data-action="show-service-update" data-go="commuter-disruption">${i('info')}<span><strong>Service update</strong><br />${activeOperatorAlert() ? state.operatorAlert.message : 'No active service disruption.'}</span></button>`;
+    <section class="list-card" style="margin-top:14px">${actionRow('star', 'Favourite routes', `${state.favourites.length} saved route${state.favourites.length === 1 ? '' : 's'} · open journey progress`, 'commuter-favourites', 'purple')}</section>
+    <button class="home-live-card" type="button" data-action="home-live-arrival" data-go="commuter-countdown"><span class="live-orb">${i('bus')}</span><span><h3>Live now · KJ5 is 2 minutes away</h3><p>Passenger crowd at Pasar Seni is moderate. Track the next arrival before you leave.</p></span>${i('chevron')}</button><h2 class="section-label">Quick journey preferences</h2><div class="preference-choice-grid">${['Lowest fare','Fastest route','Avoid transfers','Avoid crowded services','Accessible route'].map(pref => `<button class="preference-choice ${state.routePriority === pref ? 'is-active' : ''}" data-preference="${pref}">${pref}</button>`).join('')}</div><button class="alert-strip" data-action="show-service-update" data-go="commuter-disruption">${i('info')}<span><strong>Service update</strong><br />${activeOperatorAlert() ? state.operatorAlert.message : 'No active service disruption.'}</span></button>`;
 }
 
 function commuterRoutePlan() {
@@ -479,7 +480,8 @@ function commuterProfile() {
 }
 
 function commuterPreferences() {
-  return `${header('Journey preferences', 'commuter-home')}<div class="form-stack">${selectField('Preferred mode', ['Rail and bus', 'Rail only', 'Bus only'])}${selectField('Route priority', ['Best balance', 'Lowest fare', 'Fastest route'])}</div><section class="list-card" style="margin-top:15px"><div class="switch-row"><div><h3>Avoid transfers</h3><p>Prioritise routes with fewer changes.</p></div><button class="toggle ${state.toggles.transfers ? 'is-on' : ''}" data-toggle="transfers" aria-label="Toggle avoid transfers"></button></div><div class="switch-row"><div><h3>Accessibility needs</h3><p>Prioritise accessible stations and routes.</p></div><button class="toggle ${state.toggles.accessible ? 'is-on' : ''}" data-toggle="accessible" aria-label="Toggle accessibility"></button></div><div class="switch-row"><div><h3>Journey alerts</h3><p>Receive travel updates for active journeys.</p></div><button class="toggle ${state.toggles.alerts ? 'is-on' : ''}" data-toggle="alerts" aria-label="Toggle alerts"></button></div></section><button class="primary-button full-width" style="margin-top:15px" data-action="preferences-save" data-go="commuter-home">Save preferences</button>`;
+  const priorities = ['Lowest fare', 'Fastest route', 'Avoid transfers', 'Avoid crowded services', 'Accessible route'];
+  return `${header('Journey preferences', 'commuter-home')}<div class="form-stack">${selectField('Preferred mode', ['Rail and bus', 'Rail only', 'Bus only'])}</div><h2 class="section-label">Route priority</h2><p class="input-hint">Choose one priority for your next journey. It will also be selected on Home.</p><div class="preference-choice-grid">${priorities.map(priority => `<button class="preference-choice ${state.routePriority === priority ? 'is-active' : ''}" data-preference="${priority}">${priority}</button>`).join('')}</div><h2 class="section-label">Additional settings</h2><section class="list-card"><div class="switch-row"><div><h3>Journey alerts</h3><p>Receive travel updates for active journeys.</p></div><button class="toggle ${state.toggles.alerts ? 'is-on' : ''}" data-toggle="alerts" aria-label="Toggle alerts"></button></div></section><button class="primary-button full-width" style="margin-top:15px" data-action="preferences-save" data-go="commuter-home">Save preferences</button>`;
 }
 
 function commuterContent() {
@@ -601,8 +603,7 @@ document.addEventListener('click', (event) => {
   if (feed) { state.selectedFeedId = feed.dataset.feedId; render(); return; }
   const preference = event.target.closest('[data-preference]');
   if (preference) {
-    const name = preference.dataset.preference;
-    state.homePreferences.has(name) ? state.homePreferences.delete(name) : state.homePreferences.add(name);
+    state.routePriority = preference.dataset.preference;
     render();
     return;
   }
