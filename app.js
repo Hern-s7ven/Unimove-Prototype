@@ -89,9 +89,9 @@ function statusbar() {
   return `<div class="statusbar"><span>${time()}</span><span class="dynamic-island"></span><span class="status-icons"><span>▮▮▮</span><span>⌁</span><span>▰</span></span></div>`;
 }
 
-function header(title, backTo, right = '') {
+function header(title, backTo, right = '', forceBack = false) {
   return `<header class="app-header">
-    ${backTo ? `<button class="back-button" data-back="${backTo}" aria-label="Go back">${i('arrowLeft')}</button>` : '<span class="header-spacer"></span>'}
+    ${backTo ? `<button class="back-button" data-back="${backTo}" ${forceBack ? 'data-force-back="true"' : ''} aria-label="Go back">${i('arrowLeft')}</button>` : '<span class="header-spacer"></span>'}
     <h1 class="app-title">${title}</h1>
     ${right || '<span class="header-spacer"></span>'}
   </header>`;
@@ -398,7 +398,7 @@ function commuterOccupancy() {
 }
 
 function commuterWallet() {
-  return `${header('Wallet', 'commuter-home', `<button class="icon-button" data-go="commuter-transactions" aria-label="Transaction history">${i('history')}</button>`)}<section class="wallet-balance"><p>AVAILABLE BALANCE</p><h2>${formatMoney(state.walletBalance)}</h2><span class="last-topup">Updated in this prototype session</span></section><section class="wallet-actions"><button class="wallet-action" data-go="commuter-topup">${i('plus')}Top up</button><button class="wallet-action" data-go="commuter-ticket">${i('ticket')}Generate QR</button><button class="wallet-action" data-go="commuter-transactions">${i('history')}History</button></section><h2 class="section-label">Recent activity</h2><div class="list-card">${state.transactions.slice(0, 2).map(transaction => listRow(transaction.icon, transaction.title, transaction.detail, transaction.amount, transaction.tone)).join('')}</div>`;
+  return `${header('Wallet', 'commuter-home', `<button class="icon-button" data-go="commuter-transactions" aria-label="Transaction history">${i('history')}</button>`, true)}<section class="wallet-balance"><p>AVAILABLE BALANCE</p><h2>${formatMoney(state.walletBalance)}</h2><span class="last-topup">Updated in this prototype session</span></section><section class="wallet-actions"><button class="wallet-action" data-go="commuter-topup">${i('plus')}Top up</button><button class="wallet-action" data-go="commuter-ticket">${i('ticket')}Generate QR</button><button class="wallet-action" data-go="commuter-transactions">${i('history')}History</button></section><h2 class="section-label">Recent activity</h2><div class="list-card">${state.transactions.slice(0, 2).map(transaction => listRow(transaction.icon, transaction.title, transaction.detail, transaction.amount, transaction.tone)).join('')}</div>`;
 }
 
 function commuterTopup() {
@@ -425,7 +425,7 @@ function commuterPayment() {
 }
 
 function commuterEarned() {
-  return `${header('Points earned', 'commuter-home')}<section class="points-hero" style="text-align:center"><p>JOURNEY COMPLETE</p><h2>+40</h2><span class="tier">Loyalty points credited for this completed journey.</span></section><section class="list-card" style="margin-top:14px">${listRow('star','New points balance','Gold commuter tier',`${state.loyaltyPoints.toLocaleString()} pts`,'purple')}</section><button class="primary-button full-width" style="margin-top:15px" data-go="commuter-loyalty">View loyalty rewards</button>${state.lastPaymentConfirmed ? '<button class="link-button full-width" style="margin-top:10px" data-go="commuter-refund">Request payment refund</button>' : ''}`;
+  return `${header('Points earned', 'commuter-wallet', '', true)}<section class="points-hero" style="text-align:center"><p>JOURNEY COMPLETE</p><h2>+40</h2><span class="tier">Loyalty points credited for this completed journey.</span></section><section class="list-card" style="margin-top:14px">${listRow('star','New points balance','Gold commuter tier',`${state.loyaltyPoints.toLocaleString()} pts`,'purple')}</section><button class="primary-button full-width" style="margin-top:15px" data-go="commuter-loyalty">View loyalty rewards</button>${state.lastPaymentConfirmed ? '<button class="link-button full-width" style="margin-top:10px" data-go="commuter-refund">Request payment refund</button>' : ''}`;
 }
 
 function commuterRefund() {
@@ -591,7 +591,10 @@ document.addEventListener('click', (event) => {
   }
   const back = event.target.closest('[data-back]');
   if (back) {
-    state.screen = state.history.pop() || back.dataset.back;
+    if (back.dataset.forceBack === 'true') {
+      state.history = [];
+      state.screen = back.dataset.back;
+    } else state.screen = state.history.pop() || back.dataset.back;
     render();
     return;
   }
