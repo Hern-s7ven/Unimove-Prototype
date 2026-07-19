@@ -244,7 +244,7 @@ button { cursor: pointer; }
 }
 
 /* UniMove purple-blue visual refresh */
-.logo-image { display: block; width: 92px; height: 86px; object-fit: contain; margin: 0 auto; mix-blend-mode: normal; }
+.logo-image { display: block; width: 92px; height: 86px; object-fit: contain; margin: 0 auto; mix-blend-mode: screen; }
 .logo-image.logo-small { width: 42px; height: 38px; margin: 0; }
 .brand-lockup { margin-top: 42px; }
 .brand-lockup h1 { color: var(--navy); }
